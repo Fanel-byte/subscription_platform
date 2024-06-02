@@ -1,0 +1,116 @@
+﻿@page "/evenement"
+
+@using BlazorApp.Models
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Navigation
+@inject ILogger<Evenement> logger
+@using System.Collections.ObjectModel
+@using System.Threading.Tasks
+
+<h1>Event</h1>
+
+<p>This page shows the list of the events that were generated.</p>
+
+@if (eventsList != null)
+{
+ 
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Event ID</th>
+                    <th>Event Type</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (eventsList != null)
+                {
+                    @foreach (var ev in eventsList)
+                    {
+                        <tr>
+                            <td>@ev.EventId</td>
+                            <td>@ev.EventType</td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="2">No events available</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+ 
+}
+else
+{
+    <p>Loading...</p>
+}
+
+
+@code {
+    private ObservableCollection<EventDetails> eventsList;
+    private HubConnection hubConnection;
+    private readonly object _eventsListLock = new object();
+    private bool showTable = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Initialize the eventsList
+            eventsList = new ObservableCollection<EventDetails>();
+
+            // Initialize the SignalR connection
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(Navigation.ToAbsoluteUri("http://localhost:5126/eventHub")) // Ensure this matches your configured HTTPS endpoint
+                .Build();
+            
+            logger.LogInformation("Attempting to start SignalR connection...");
+            await hubConnection.StartAsync();
+            logger.LogInformation("SignalR connection started successfully.");
+
+            // Subscribe to the ReceiveEvent method
+           hubConnection.On<EventDetails>("ReceiveEvent", async (eventData) =>
+{
+    await InvokeAsync(() =>
+    {
+        lock (_eventsListLock)
+        {
+            eventsList.Add(eventData);
+            logger.LogInformation($"Event received: {eventData.EventType}");
+            logger.LogInformation($"Events count: {eventsList.Count}");
+
+            foreach (var ev in eventsList)
+            {
+                logger.LogInformation($"Event ID: {ev.EventId}, Event Type: {ev.EventType}");
+            }
+
+            // Update showTable flag only if it's false to prevent overriding if already set to true
+            if (!showTable)
+            {
+           
+                    logger.LogInformation("Show table after delay.");
+                    showTable = true;
+                    InvokeAsync(StateHasChanged); // Call StateHasChanged() within InvokeAsync
+          
+            }
+        }
+    });
+});
+
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "An error occurred while initializing SignalR.");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}

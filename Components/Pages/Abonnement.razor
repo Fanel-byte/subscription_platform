@@ -1,0 +1,59 @@
+﻿@page "/abonnement"
+@using BlazorApp.Models
+@using Microsoft.EntityFrameworkCore
+@inject Data.AppDBContext dbContext
+@inject ILogger<Abonnement> logger
+
+<h1>Subscription List</h1>
+
+<p>This page shows the list of the Subscriptions that were made.</p>
+<table class="table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Creation Time</th>
+            <th>CallBack URL</th>
+            <th>Selected Events</th>
+            <th>Send All Data</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (subscriptionsList != null && subscriptionsList.Any())
+        {
+            @foreach (var sub in subscriptionsList.OrderByDescending(s => s.CreationTime))
+            {
+                <tr>
+                    <td>@sub.Id</td>
+                    <td>@sub.CreationTime.ToString("g")</td>
+                    <td>@(sub.CallBackURL ?? "N/A")</td> <!-- Handle null value -->
+                    <td>@(sub.SelectedEvents != null ? string.Join(", ", sub.SelectedEvents) : "N/A")</td>
+                    <td>@(sub.SendAll ? "Yes" : "No")</td>
+                </tr>
+            }
+        }
+        else
+        {
+            <tr>
+                <td colspan="4">No subscriptions available</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<Subscription> subscriptionsList = new List<Subscription>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            logger.LogInformation("Fetching subscriptions from the database...");
+            subscriptionsList = await dbContext.Subscriptions.ToListAsync();
+            logger.LogInformation("Subscriptions fetched: {@subscriptionsList}", subscriptionsList);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "An error occurred while fetching subscriptions.");
+        }
+    }
+}

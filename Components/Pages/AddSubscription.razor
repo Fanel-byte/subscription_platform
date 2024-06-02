@@ -1,0 +1,111 @@
+﻿@page "/AddSubscription"
+@using BlazorApp.Models
+@using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
+<link rel="stylesheet" href="~/css/Style.css" />
+
+<PageTitle>Subscription</PageTitle>
+
+<h1>Create your subscription now</h1>
+<EditForm Model="@newSubscriptionModel" OnValidSubmit="SubmitForm" FormName="SubscriptionForm">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="form-group">
+        <label>CallBack URL</label>
+        <InputText @bind-Value="newSubscriptionModel.CallBackURL" class="form-control" />
+        <ValidationMessage For="@(() => newSubscriptionModel.CallBackURL)" />
+    </div>
+    <br />
+    <div class="form-group">
+        <label>Do you want to receive all the data of the entity concerned about the event?</label>
+        <InputCheckbox @bind-Value="newSubscriptionModel.SendAll" class="form-check-input" />
+    </div>
+    <br />
+    <div class="form-group">
+        <label>Events</label>
+        @foreach (var evt in events)
+        {
+            <div class="form-check">
+                <InputCheckbox @bind-Value="eventSelections[evt]" class="form-check-input" /> @evt
+            </div>
+        }
+    </div>
+    <br />
+      <div class="form-group">
+        <label>Do you want to active subscription now? </label>
+        <InputCheckbox @bind-Value="newSubscriptionModel.active" class="form-check-input" />
+    </div>
+    <br />
+    <div class="form-group">
+        <label>Retry Attempts</label>
+        <InputNumber @bind-Value="newSubscriptionModel.retryAttempts" class="form-control"  max="2" />
+    </div>
+    <br />
+    <button type="submit" class="btn btn-primary">Subscribe to the event</button>
+
+    @if (saved)
+    {
+        <p>The subscription was made successfully.</p>
+    }
+    @if (error)
+    {
+        <p>Error : You should subscribe to at least one event.</p>
+    }
+</EditForm>
+
+@if (selEvents.Any())
+{
+    <div class="selected-events">
+        <p>The selected events are: @string.Join(", ", selEvents)</p>
+    </div>
+}
+
+@inject Data.AppDBContext dbContext
+@inject NavigationManager navigationManager
+
+@code {
+    private bool saved = false;
+    private bool error = false;
+
+    private Subscription newSubscriptionModel = new Subscription();
+    private List<string> events = new List<string> { "Lot creation", "Lot edited" };
+
+    private Dictionary<string, bool> eventSelections;
+
+    protected override void OnInitialized()
+    {
+        eventSelections = events.ToDictionary(evt => evt, _ => false);
+    }
+
+    private List<string> selEvents => eventSelections.Where(kv => kv.Value).Select(kv => kv.Key).ToList();
+
+    private async Task SubmitForm()
+    {
+        saved = false;
+        error = false;
+
+   if (selEvents.Count == 0)
+    {
+        // Display error message or handle validation failure as needed
+        error = true;
+        return;
+    }
+        newSubscriptionModel.SelectedEvents = selEvents;
+
+        try
+        {
+            newSubscriptionModel.CreationTime = DateTime.Now;
+            dbContext.Subscriptions.Add(newSubscriptionModel);
+            await dbContext.SaveChangesAsync();
+            saved = true;
+            navigationManager.NavigateTo("/abonnement");
+        }
+        catch (Exception ex)
+        {
+            // Handle the exception as needed
+            error = true;
+            throw;
+        }
+    }
+}
